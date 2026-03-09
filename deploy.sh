@@ -69,6 +69,7 @@ fi
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 mkdir -p "$APP_DIR/data/projects"
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR/data"
+mkdir -p "$APP_DIR/static"
 
 # ── 4. Secrets ────────────────────────────────────────────────────────────────
 step "Secrets"
