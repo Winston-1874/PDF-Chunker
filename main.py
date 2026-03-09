@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import fcntl, json, os, re, secrets, hashlib, zipfile, io
+import fcntl, io, json, os, re, secrets, shutil, zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -11,11 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer
 
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "Baclain1!")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "changeme")
 SECRET_KEY   = os.environ.get("SECRET_KEY", "CHANGEME_FIXED_KEY")
-DATA_DIR     = Path("/opt/pdf-chunker/data")
+DATA_DIR     = Path(os.environ.get("DATA_DIR", "/opt/pdf-chunker/data"))
 PROJECTS_DIR = DATA_DIR / "projects"
 PRESETS_FILE = DATA_DIR / "presets.json"
+
+_PID_RE = re.compile(r'^[0-9a-f]{12}$')
 
 for d in (DATA_DIR, PROJECTS_DIR):
     d.mkdir(parents=True, exist_ok=True)
@@ -74,6 +76,8 @@ def save_presets(d): save_json_file(PRESETS_FILE, d)
 # ── Project helpers ───────────────────────────────────────────────────────────
 
 def project_dir(pid: str) -> Path:
+    if not _PID_RE.match(pid):
+        raise HTTPException(400, "Identifiant de projet invalide.")
     return PROJECTS_DIR / pid
 
 def load_project(pid: str):
@@ -104,7 +108,7 @@ def apply_chunking(md_text: str, removals: list, splits: list,
     for r in removals:
         if r and r.strip():
             try: md_text = re.sub(r, " ", md_text)
-            except: pass
+            except re.error: pass
 
     # 2. Splits
     segments = [md_text]
@@ -286,7 +290,6 @@ async def create_project(request: Request):
 @app.delete("/projects/{pid}")
 async def delete_project(request: Request, pid: str):
     if not check_auth(request): raise HTTPException(401)
-    import shutil
     d = project_dir(pid)
     if d.exists(): shutil.rmtree(d)
     return JSONResponse({"ok": True})
@@ -315,7 +318,7 @@ async def upload_pdf(
             p_end   = int(page_end)   if page_end   else p_doc.page_count
             pages   = list(range(max(0, p_start-1), min(p_doc.page_count, p_end)))
             p_doc.close()
-    except: pass
+    except Exception: pass
 
     raw_md = pymupdf4llm.to_markdown(str(pdf_path), pages=pages)
     (project_dir(pid) / "raw.md").write_bytes(raw_md.encode("utf-8"))
