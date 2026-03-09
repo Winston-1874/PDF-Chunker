@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Configurator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#f7f7f5;--white:#fff;--border:#e5e5e2;--border-dark:#ccc;--text:#1a1a1a;--muted:#999;--muted2:#bbb;--accent:#1a1a1a;--blue:#2563eb;--red:#dc2626;--green:#16a34a;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px}
+  header{background:var(--white);border-bottom:1px solid var(--border);padding:0 32px;height:48px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.05em}
+  .logo span{color:var(--muted)}
+  .logout{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none}
+  .logout:hover{color:var(--text)}
+  .main{max-width:760px;margin:48px auto;padding:0 24px}
+  .page-title{font-size:18px;font-weight:500;margin-bottom:8px}
+  .page-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:32px}
+  .new-project-box{background:var(--white);border:1px solid var(--border);padding:20px 24px;margin-bottom:32px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .label{font-family:var(--mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block}
+  input[type="text"]{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
+  input:focus{border-color:var(--accent)}
+  .btn{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;padding:8px 16px;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);transition:all .15s}
+  .btn:hover{border-color:var(--accent)}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary:hover{background:#333;border-color:#333}
+  .btn-danger{color:var(--red)}
+  .btn-danger:hover{border-color:var(--red);background:#fef2f2}
+  .project-list{display:flex;flex-direction:column;gap:8px}
+  .project-card{background:var(--white);border:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .15s}
+  .project-card:hover{border-color:var(--border-dark)}
+  .project-name{font-size:14px;font-weight:500;margin-bottom:4px}
+  .project-meta{font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .status-badge{font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--border)}
+  .status-empty{color:var(--muted)}
+  .status-raw{color:var(--blue);border-color:var(--blue)}
+  .status-configured{color:#d97706;border-color:#d97706}
+  .status-done{color:var(--green);border-color:var(--green)}
+  .project-right{display:flex;align-items:center;gap:12px}
+  .empty-state{font-family:var(--mono);font-size:11px;color:var(--muted2);text-align:center;padding:48px 0}
+  .section-title{font-family:var(--mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;font-family:var(--mono);font-size:11px;padding:10px 16px;transform:translateY(60px);opacity:0;transition:all .2s;pointer-events:none;z-index:999}
+  .toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">RAG<span>/</span>Config</div>
+  <a href="/logout" class="logout">Déconnexion</a>
+</header>
+<div class="main">
+  <div class="page-title">Projets</div>
+  <div class="page-sub">Un projet = un texte juridique. Configurez le chunking et les préfixes de contexte RAG.</div>
+  <div class="new-project-box">
+    <div class="section-title">Nouveau projet</div>
+    <div class="row">
+      <div><span class="label">Nom</span><input type="text" id="newName" placeholder="ex. Code des sociétés et associations"></div>
+      <div><span class="label">Description (optionnel)</span><input type="text" id="newDesc" placeholder="ex. Version consolidée 2024"></div>
+    </div>
+    <button class="btn btn-primary" onclick="createProject()">Créer →</button>
+  </div>
+  <div class="section-title">Projets existants</div>
+  <div class="project-list" id="projectList">
+    {% if projects %}
+      {% for p in projects %}
+      <div class="project-card" onclick="window.location='/project/{{ p.id }}'">
+        <div>
+          <div class="project-name">{{ p.name }}</div>
+          <div class="project-meta">{% if p.filename %}{{ p.filename }} · {% endif %}{% if p.stats %}{{ p.stats.total }} chunks · {% endif %}{{ p.created_at[:10] }}</div>
+        </div>
+        <div class="project-right">
+          <span class="status-badge status-{{ p.status }}">{{ p.status }}</span>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:10px" onclick="event.stopPropagation();deleteProject('{{ p.id }}',this)">✕</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">Aucun projet. Créez-en un ci-dessus.</div>
+    {% endif %}
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+async function createProject(){
+  const name=document.getElementById('newName').value.trim();
+  const desc=document.getElementById('newDesc').value.trim();
+  if(!name)return alert('Nom requis.');
+  const res=await fetch('/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:desc})});
+  if(!res.ok)return alert('Erreur.');
+  const proj=await res.json();
+  window.location='/project/'+proj.id;
+}
+async function deleteProject(pid,btn){
+  if(!confirm('Supprimer ce projet et toutes ses données ?'))return;
+  const res=await fetch(`/projects/${pid}`,{method:'DELETE'});
+  if(!res.ok)return alert('Erreur.');
+  btn.closest('.project-card').remove();
+  toast('Projet supprimé.');
+}
+</script>
+</body>
+</html>
