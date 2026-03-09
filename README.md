@@ -1,4 +1,4 @@
-# RAG Configurator — PDF Chunker v5
+# RAG Configurator — PDF Chunker
 
 Application web FastAPI pour configurer le chunking de textes juridiques en vue d'une utilisation RAG.
 
@@ -21,18 +21,3 @@ Application web FastAPI pour configurer le chunking de textes juridiques en vue 
 - Conversion PDF : PyMuPDF / pymupdf4llm
 - Auth : cookie signé (itsdangerous)
 - Templates : Jinja2
-
-## Lancement local
-
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-APP_PASSWORD=monmotdepasse SECRET_KEY=maclef uvicorn main:app --reload --port 8765
-```
-
-Accéder à : http://localhost:8765
-
-## Déploiement serveur
-
-Utiliser `deploy_v5.sh` (installe le service systemd sur `/opt/pdf-chunker`).
