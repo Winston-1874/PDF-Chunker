@@ -1,4 +1,4 @@
-# RAG Configurator — PDF Chunker v5
+# RAG Configurator — PDF Chunker
 
 Application web FastAPI pour configurer le chunking de textes juridiques en vue d'une utilisation RAG.
 
@@ -35,4 +35,4 @@ Accéder à : http://localhost:8765
 
 ## Déploiement serveur
 
-Utiliser `deploy_v5.sh` (installe le service systemd sur `/opt/pdf-chunker`).
+Utiliser `deploy_vXX.sh` (installe le service systemd sur `/opt/pdf-chunker`).
