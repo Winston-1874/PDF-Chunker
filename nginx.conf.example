@@ -1,0 +1,29 @@
+# /etc/nginx/sites-available/pdf-chunker
+# Adapter le server_name et le chemin du certificat SSL
+
+server {
+    listen 80;
+    server_name votre-domaine.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name votre-domaine.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/votre-domaine.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/votre-domaine.example.com/privkey.pem;
+
+    # Timeouts étendus pour l'upload PDF + traitement
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
