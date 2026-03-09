@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ project.name }} — RAG Config</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#f7f7f5;--white:#fff;--border:#e5e5e2;--border-dark:#ccc;--text:#1a1a1a;--muted:#999;--muted2:#bbb;--accent:#1a1a1a;--blue:#2563eb;--red:#dc2626;--green:#16a34a;--amber:#d97706;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px}
+  header{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:48px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.05em}
+  .logo span{color:var(--muted)}
+  .header-right{display:flex;align-items:center;gap:16px}
+  .back,.logout{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none}
+  .back:hover,.logout:hover{color:var(--text)}
+  .layout{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 48px)}
+  .panel-left{background:var(--white);border-right:1px solid var(--border);padding:24px 20px;overflow-y:auto;max-height:calc(100vh - 48px);display:flex;flex-direction:column;gap:18px}
+  .panel-right{padding:28px 32px;overflow-y:auto;max-height:calc(100vh - 48px)}
+  .label{font-family:var(--mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;display:block}
+  .section-head{font-family:var(--mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:12px}
+  input[type="text"],input[type="number"],select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  .upload-zone{border:1px dashed var(--border-dark);padding:16px;text-align:center;cursor:pointer;position:relative;transition:all .15s;background:var(--bg)}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:#f0f0ee}
+  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2}
+  .upload-zone .hint{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .upload-zone .chosen{font-family:var(--mono);font-size:10px;color:var(--green);margin-top:4px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .opt-box{background:var(--bg);border:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:10px}
+  .checkbox-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px}
+  .btn{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);transition:all .15s}
+  .btn:hover{border-color:var(--accent);background:var(--bg)}
+  .btn-primary{width:100%;background:var(--accent);color:#fff;border-color:var(--accent);padding:10px;margin-top:4px}
+  .btn-primary:hover{background:#333;border-color:#333}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed}
+  .btn-sm{padding:5px 10px;font-size:10px}
+  .btn-danger{color:var(--red);border-color:var(--border)}
+  .btn-danger:hover{border-color:var(--red);background:#fef2f2}
+  .btn-blue{color:var(--blue);border-color:var(--border)}
+  .btn-blue:hover{border-color:var(--blue);background:#eff6ff}
+  .rules-block{background:var(--bg);border:1px solid var(--border);padding:12px}
+  .rule-row{display:flex;gap:6px;margin-bottom:6px}
+  .rule-row input{flex:1}
+  .btn-add{width:100%;background:none;border:1px dashed var(--border-dark);color:var(--muted);font-family:var(--mono);font-size:10px;padding:6px;cursor:pointer;margin-bottom:8px;transition:all .15s}
+  .btn-add:hover{border-color:var(--blue);color:var(--blue)}
+  .prefix-rule-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
+  .prefix-rule-row .pattern{flex:1.2;min-width:120px}
+  .prefix-rule-row .label-input{flex:1;min-width:100px}
+  .prefix-rule-header{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;margin-bottom:4px}
+  .prefix-rule-header span{font-family:var(--mono);font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em}
+  .test-result{background:var(--bg);border:1px solid var(--border);padding:12px;margin-top:8px;display:none}
+  .test-result.open{display:block}
+  .test-result-head{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px}
+  .test-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .test-col-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:6px}
+  .test-col-title.match{color:var(--green)}
+  .test-col-title.nomatch{color:var(--red)}
+  .test-item{font-family:var(--mono);font-size:10px;padding:6px 8px;background:var(--white);border:1px solid var(--border);margin-bottom:4px;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden}
+  .preset-row{display:flex;gap:6px}
+  .preset-row select{flex:1}
+  .sep{height:1px;background:var(--border);margin:4px 0}
+  .cheat-toggle{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--blue);cursor:pointer;background:none;border:none;padding:0;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em}
+  .cheatsheet{display:none;background:var(--bg);border:1px solid var(--border);padding:12px}
+  .cheatsheet.open{display:block}
+  .cheat-section-title{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;margin-top:10px}
+  .cheat-section-title:first-child{margin-top:0}
+  .cheat-item{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+  .cheat-item:last-child{border-bottom:none}
+  .cheat-code{font-family:var(--mono);font-size:10px;color:var(--text);word-break:break-all;flex:1}
+  .cheat-desc{font-size:10px;color:var(--muted);white-space:nowrap}
+  .cheat-add-btns{display:flex;gap:4px;flex-shrink:0}
+  .cheat-add-btn{font-family:var(--mono);font-size:9px;padding:2px 6px;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--muted);transition:all .1s;white-space:nowrap}
+  .cheat-add-btn:hover{border-color:var(--blue);color:var(--blue)}
+  .proj-title{font-size:16px;font-weight:500;margin-bottom:4px}
+  .proj-desc{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:24px}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+  .stat-card{background:var(--white);border:1px solid var(--border);padding:12px 14px}
+  .stat-val{font-family:var(--mono);font-size:20px;font-weight:500}
+  .stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .stat-sub{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:1px}
+  .stat-warn{color:var(--amber)}
+  .dist-bars{display:flex;flex-direction:column;gap:6px;margin:10px 0 20px}
+  .dist-row{display:grid;grid-template-columns:80px 1fr 36px;align-items:center;gap:10px;font-family:var(--mono);font-size:11px}
+  .dist-bar-wrap{height:8px;background:var(--border)}
+  .dist-bar-fill{height:100%;background:var(--blue);transition:width .3s}
+  .unresolved-box{background:#fffbeb;border:1px solid #fcd34d;padding:16px;margin-bottom:20px}
+  .unresolved-title{font-family:var(--mono);font-size:11px;color:var(--amber);margin-bottom:12px}
+  .unresolved-group{background:var(--white);border:1px solid var(--border);padding:10px 12px;margin-bottom:8px}
+  .unresolved-group-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px}
+  .unresolved-group-preview{font-family:var(--mono);font-size:10px;white-space:pre-wrap;word-break:break-word;max-height:60px;overflow:hidden;margin-bottom:8px;opacity:.7}
+  .unresolved-group-input{display:flex;gap:8px;align-items:center}
+  .unresolved-group-input input{flex:1;font-size:11px}
+  .unresolved-actions{display:flex;gap:8px;margin-top:12px}
+  .view-toggle{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);width:fit-content}
+  .tog-btn{background:var(--white);border:none;color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:0.1em;padding:6px 16px;cursor:pointer;text-transform:uppercase;transition:all .15s}
+  .tog-btn:first-child{border-right:1px solid var(--border)}
+  .tog-btn.active{background:var(--accent);color:#fff}
+  .preview-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+  .tab-btn{background:var(--white);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 12px;cursor:pointer;transition:all .15s}
+  .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .chunk-card{border:1px solid var(--border);background:var(--white);display:none;padding:16px}
+  .chunk-card.active{display:block}
+  .chunk-meta{font-size:10px;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;gap:16px;font-family:var(--mono);flex-wrap:wrap}
+  .chunk-prefix{font-family:var(--mono);font-size:10px;color:var(--blue);margin-bottom:8px}
+  .chunk-text{font-family:var(--mono);font-size:11px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+  #rawContent{border:1px solid var(--border);background:var(--white);padding:16px;font-family:var(--mono);font-size:11px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:55vh;overflow-y:auto}
+  .dl-row{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+  .dl-btn{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-decoration:none;border:1px solid var(--border);padding:7px 14px;color:var(--text);transition:all .15s}
+  .dl-btn:hover{border-color:var(--accent);background:var(--bg)}
+  .dl-btn.disabled{opacity:.4;pointer-events:none}
+  .welcome{display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:10px;color:var(--muted2)}
+  .spinner{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;font-family:var(--mono);font-size:11px;padding:10px 16px;transform:translateY(60px);opacity:0;transition:all .2s;pointer-events:none;z-index:999}
+  .toast.show{transform:translateY(0);opacity:1}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-dark)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">RAG<span>/</span>Config</div>
+  <div class="header-right">
+    <a href="/" class="back">← Projets</a>
+    <a href="/logout" class="logout">Déconnexion</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="panel-left">
+    <!-- 1. PDF -->
+    <div>
+      <div class="section-head">1 · PDF source</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf">
+        <div class="hint">{% if project.filename %}{{ project.filename }}{% else %}Déposer un PDF ou cliquer{% endif %}</div>
+        <div class="chosen" id="fileChosen"></div>
+      </div>
+      <div class="two-col" style="margin-top:8px">
+        <div><span class="label">Page début</span><input type="number" id="pageStart" min="1" placeholder="1"></div>
+        <div><span class="label">Page fin</span><input type="number" id="pageEnd" min="1" placeholder="fin"></div>
+      </div>
+      <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()" style="margin-top:10px">
+        {% if project.filename %}Ré-uploader{% else %}Uploader →{% endif %}
+      </button>
+    </div>
+    <!-- 2. Options -->
+    <div>
+      <div class="section-head">2 · Options</div>
+      <div class="opt-box">
+        <div><span class="label" style="margin-bottom:5px">Taille max chunk (chars)</span><input type="number" id="maxChunkSize" value="{{ project.rules.max_size or 2500 }}" min="200"></div>
+        <div class="checkbox-row"><input type="checkbox" id="addMarkers" {% if project.rules.add_markers != false %}checked{% endif %}><label for="addMarkers" style="font-family:var(--mono);font-size:11px;cursor:pointer">Marqueurs de continuité</label></div>
+      </div>
+    </div>
+    <!-- 3. Preset -->
+    <div>
+      <div class="section-head">3 · Preset</div>
+      <div class="preset-row">
+        <select id="presetSelect" onchange="applySelectedPreset()">
+          <option value="">— Personnalisé —</option>
+          {% for p in presets %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-sm btn-danger" onclick="deleteCurrentPreset()">✕</button>
+      </div>
+    </div>
+    <!-- 4. Règles -->
+    <div>
+      <div class="section-head">4 · Suppressions &amp; séparateurs</div>
+      <div class="rules-block">
+        <div class="label" style="margin-bottom:6px">Suppressions</div>
+        <div id="removalsList"></div>
+        <button class="btn-add" onclick="addRuleRow('removalsList')">+ Suppression</button>
+        <div class="sep"></div>
+        <div class="label" style="margin:8px 0 6px">Séparateurs de découpe</div>
+        <div id="splitsList"></div>
+        <button class="btn-add" onclick="addRuleRow('splitsList')">+ Séparateur</button>
+      </div>
+      <div style="margin-top:10px">
+        <button class="cheat-toggle" onclick="toggleCheat()"><span id="cheatArrow">▶</span> Aide-mémoire regex</button>
+        <div class="cheatsheet" id="cheatsheet">
+          <div class="cheat-section-title">Moniteur belge</div>
+          <div class="cheat-item"><div><div class="cheat-code">\n\nPage \d+ de \d+ Copyright Moniteur belge \d{2}-\d{2}-\d{4}\n\n</div><div class="cheat-desc">Pied de page</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
+          <div class="cheat-item"><div><div class="cheat-code">([a-zàâéèêëîïôùûüç,])\n([a-zàâéèêëîïôùûüç])</div><div class="cheat-desc">Coupures mid-phrase</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
+          <div class="cheat-section-title">Séparateurs — Codes belges</div>
+          <div class="cheat-item"><div><div class="cheat-code">\n\n(Art\. \d+:\d+)</div><div class="cheat-desc">Art. X:Y — CSA, Code civil</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('spl',this)">÷ Séparer</button></div></div>
+          <div class="cheat-item"><div><div class="cheat-code">\n\n(Art\. \d+)</div><div class="cheat-desc">Art. X — Code pénal, TVA…</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('spl',this)">÷ Séparer</button></div></div>
+          <div class="cheat-item"><div><div class="cheat-code">\n\n(Article \d+)</div><div class="cheat-desc">Article X (forme longue)</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('spl',this)">÷ Séparer</button></div></div>
+          <div class="cheat-section-title">Nettoyage général</div>
+          <div class="cheat-item"><div><div class="cheat-code">\n{3,}</div><div class="cheat-desc">Sauts de ligne multiples</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
+          <div class="cheat-item"><div><div class="cheat-code">^\s*\d+\s*$</div><div class="cheat-desc">Numéros de page seuls</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
+        </div>
+      </div>
+    </div>
+    <!-- 5. Préfixes -->
+    <div>
+      <div class="section-head">5 · Préfixes de contexte</div>
+      <div class="rules-block">
+        <div class="prefix-rule-header"><span>Pattern regex</span><span>Libellé</span><span></span><span></span></div>
+        <div id="prefixList"></div>
+        <button class="btn-add" onclick="addPrefixRow()">+ Règle de préfixe</button>
+      </div>
+      <div id="testResultPanel" class="test-result"></div>
+    </div>
+    <!-- Save + Generate -->
+    <div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input type="text" id="newPresetName" placeholder="Nom du preset…">
+        <button class="btn btn-sm" onclick="saveNewPreset()">Sauver</button>
+      </div>
+      <button class="btn btn-primary" id="generateBtn" onclick="generate()">Générer les chunks →</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <a href="/projects/{{ project.id }}/export-config" class="btn btn-sm" style="text-decoration:none;text-align:center;flex:1">↓ Export config</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL DROIT -->
+  <div class="panel-right">
+    <div class="proj-title">{{ project.name }}</div>
+    <div class="proj-desc">{% if project.description %}{{ project.description }} · {% endif %}Statut : <strong>{{ project.status }}</strong>{% if project.filename %} · {{ project.filename }}{% endif %}</div>
+    <div id="welcome" class="welcome" {% if project.stats %}style="display:none"{% endif %}>
+      <div style="font-size:28px;opacity:.3">⚙</div>
+      <div style="font-family:var(--mono);font-size:11px">Uploadez le PDF puis générez les chunks.</div>
+    </div>
+    <div id="results" {% if not project.stats %}style="display:none"{% endif %}>
+      <div id="unresolvedBox" style="display:none"></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-val" id="sTotal">{{ project.stats.total if project.stats else '—' }}</div><div class="stat-label">Chunks</div></div>
+        <div class="stat-card"><div class="stat-val" id="sMax">{{ project.stats.max_size|default('—') }}</div><div class="stat-label">Max chars</div><div class="stat-sub" id="sMaxTok"></div></div>
+        <div class="stat-card"><div class="stat-val" id="sAvg">{{ project.stats.avg_size|default('—') }}</div><div class="stat-label">Moy. chars</div><div class="stat-sub" id="sAvgTok"></div></div>
+        <div class="stat-card"><div class="stat-val stat-warn" id="sUnresolved">{{ project.stats.unresolved|default(0) }}</div><div class="stat-label">Sans préfixe</div></div>
+      </div>
+      <span class="label">Distribution</span>
+      <div id="distBars" class="dist-bars"></div>
+      <span class="label">Aperçu</span>
+      <div class="view-toggle">
+        <button class="tog-btn active" id="togChunked" onclick="switchView('chunked')">Chunké</button>
+        <button class="tog-btn" id="togRaw" onclick="switchView('raw')">Brut</button>
+      </div>
+      <div id="chunkedView"><div id="previewTabs" class="preview-tabs"></div><div id="previewCards"></div></div>
+      <div id="rawView" style="display:none">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px">Sortie brute pymupdf4llm avant règles.</div>
+        <pre id="rawContent"></pre>
+      </div>
+      <div class="dl-row">
+        <a id="dlChunks" href="/projects/{{ project.id }}/download/chunks" class="dl-btn {% if project.status != 'done' %}disabled{% endif %}">↓ Chunks MD</a>
+        <a id="dlZip"    href="/projects/{{ project.id }}/download/zip"    class="dl-btn {% if project.status != 'done' %}disabled{% endif %}">↓ ZIP chunks</a>
+        <a id="dlRaw"    href="/projects/{{ project.id }}/download/raw"    class="dl-btn {% if project.status == 'empty' %}disabled{% endif %}">↓ Raw MD</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script id="data-project" type="application/json">{{ project|tojson }}</script>
+<script id="data-presets" type="application/json">{{ presets|tojson }}</script>
+<script>
+const PID="{{ project.id }}";
+let project={},presets=[],rawCache=null;
+try{project=JSON.parse(document.getElementById('data-project').textContent);}catch(e){}
+try{presets=JSON.parse(document.getElementById('data-presets').textContent);}catch(e){}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+(function initRules(){
+  const r=project.rules||{};
+  (r.removals||[]).forEach(v=>addRuleRow('removalsList',v));
+  (r.splits||[]).forEach(v=>addRuleRow('splitsList',v));
+  (r.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern||'',pr.label||''));
+  if(r.max_size)document.getElementById('maxChunkSize').value=r.max_size;
+  if(r.add_markers===false)document.getElementById('addMarkers').checked=false;
+  if(project.stats)renderStats(project.stats,[]);
+})();
+function addRuleRow(id,val=''){
+  const c=document.getElementById(id),d=document.createElement('div');
+  d.className='rule-row';
+  d.innerHTML=`<input type="text" value="${esc(val)}" placeholder="regex…"><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(d);
+}
+function getRules(id){return Array.from(document.querySelectorAll(`#${id} input`)).map(i=>i.value.trim()).filter(Boolean);}
+function addPrefixRow(pattern='',label=''){
+  const c=document.getElementById('prefixList'),d=document.createElement('div');
+  d.className='prefix-rule-row';
+  d.innerHTML=`<input type="text" class="pattern" value="${esc(pattern)}" placeholder="ex. Art\\.\\s*5:"><input type="text" class="label-input" value="${esc(label)}" placeholder="ex. CSA — Livre 5 : SRL"><button class="btn btn-sm btn-blue" onclick="testPrefixRule(this)">Test</button><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(d);
+}
+function getPrefixRules(){
+  return Array.from(document.querySelectorAll('#prefixList .prefix-rule-row')).map(row=>({
+    pattern:row.querySelector('.pattern').value.trim(),
+    label:row.querySelector('.label-input').value.trim()
+  })).filter(r=>r.pattern);
+}
+async function testPrefixRule(btn){
+  const row=btn.closest('.prefix-rule-row');
+  const pattern=row.querySelector('.pattern').value.trim();
+  if(!pattern){toast('Pattern vide.');return;}
+  btn.textContent='…';btn.disabled=true;
+  const panel=document.getElementById('testResultPanel');
+  try{
+    const res=await fetch(`/projects/${PID}/test-prefix`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pattern,rules:collectRules()})});
+    const data=await res.json();
+    if(data.error){panel.innerHTML=`<div style="color:var(--red);font-family:var(--mono);font-size:11px">${esc(data.error)}</div>`;panel.classList.add('open');return;}
+    panel.classList.add('open');
+    panel.innerHTML=`<div class="test-result-head">Pattern : <strong>${esc(pattern)}</strong> — ${data.match_count} match(es) sur ${data.match_count+data.no_match_count} chunks</div>
+    <div class="test-cols">
+      <div><div class="test-col-title match">✓ Matchent (${data.match_count}) — 5 premiers</div>${data.matches.map(m=>`<div class="test-item"><span style="color:var(--muted)">#${m.index}</span> ${esc(m.preview)}</div>`).join('')||'<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Aucun</div>'}</div>
+      <div><div class="test-col-title nomatch">✗ Ne matchent pas (${data.no_match_count}) — 5 premiers</div>${data.no_matches.map(m=>`<div class="test-item"><span style="color:var(--muted)">#${m.index}</span> ${esc(m.preview)}</div>`).join('')||'<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Aucun</div>'}</div>
+    </div>`;
+  }catch(e){toast('Erreur : '+e.message);}
+  finally{btn.textContent='Test';btn.disabled=false;}
+}
+function applySelectedPreset(){
+  const id=document.getElementById('presetSelect').value;
+  document.getElementById('removalsList').innerHTML='';document.getElementById('splitsList').innerHTML='';document.getElementById('prefixList').innerHTML='';
+  const p=presets.find(x=>x.id===id);
+  if(p){(p.removals||[]).forEach(r=>addRuleRow('removalsList',r));(p.splits||[]).forEach(s=>addRuleRow('splitsList',s));(p.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern,pr.label));}
+}
+async function deleteCurrentPreset(){
+  const id=document.getElementById('presetSelect').value;
+  if(!id||!confirm('Supprimer ce preset ?'))return;
+  await fetch(`/presets/${id}`,{method:'DELETE'});location.reload();
+}
+async function saveNewPreset(){
+  const name=document.getElementById('newPresetName').value.trim();
+  if(!name)return alert('Nom requis.');
+  await fetch('/presets',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules()})});
+  location.reload();
+}
+async function uploadPdf(){
+  const f=document.getElementById('fileInput').files[0];
+  if(!f){toast('Aucun fichier sélectionné.');return;}
+  const btn=document.getElementById('uploadBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Conversion…';
+  try{
+    const fd=new FormData();fd.append('file',f);
+    fd.append('page_start',document.getElementById('pageStart').value);
+    fd.append('page_end',document.getElementById('pageEnd').value);
+    const res=await fetch(`/projects/${PID}/upload`,{method:'POST',body:fd});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    toast(`PDF converti — ${(data.chars/1000).toFixed(0)}k caractères bruts.`);
+    document.querySelector('.upload-zone .hint').textContent=f.name;
+    document.getElementById('dlRaw').classList.remove('disabled');
+  }catch(e){alert('Erreur upload : '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='Ré-uploader';}
+}
+function collectRules(){
+  return{removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules(),
+    max_size:parseInt(document.getElementById('maxChunkSize').value)||2500,
+    add_markers:document.getElementById('addMarkers').checked};
+}
+async function generate(manualLabels={},acceptUnresolved=false){
+  const btn=document.getElementById('generateBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Génération…';
+  try{
+    const res=await fetch(`/projects/${PID}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rules:collectRules(),manual_labels:manualLabels,accept_unresolved:acceptUnresolved})});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    renderStats(data.stats,data.unresolved_groups||[]);
+    renderPreview(data.preview);
+    document.getElementById('welcome').style.display='none';
+    document.getElementById('results').style.display='block';
+    if(data.done){
+      toast(`${data.stats.total} chunks générés.`);
+      document.getElementById('dlChunks').classList.remove('disabled');
+      document.getElementById('dlZip').classList.remove('disabled');
+    }
+  }catch(e){alert('Erreur : '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='Générer les chunks →';}
+}
+function renderStats(s,unresolvedGroups){
+  document.getElementById('sTotal').innerText=s.total;
+  document.getElementById('sMax').innerText=s.max_size.toLocaleString();document.getElementById('sMaxTok').innerText='≈ '+s.max_tokens.toLocaleString()+' tok';
+  document.getElementById('sAvg').innerText=s.avg_size.toLocaleString();document.getElementById('sAvgTok').innerText='≈ '+s.avg_tokens.toLocaleString()+' tok';
+  document.getElementById('sUnresolved').innerText=s.unresolved||0;
+  const tot=s.total||1;
+  document.getElementById('distBars').innerHTML=Object.entries(s.buckets).map(([k,v])=>{
+    const pct=(v/tot*100).toFixed(1);
+    return `<div class="dist-row"><div style="color:var(--muted)">${k}</div><div class="dist-bar-wrap"><div class="dist-bar-fill" style="width:${pct}%"></div></div><div style="text-align:right">${v}</div></div>`;
+  }).join('');
+  renderUnresolved(unresolvedGroups);
+}
+function renderUnresolved(groups){
+  const box=document.getElementById('unresolvedBox');
+  if(!groups||!groups.length){box.style.display='none';return;}
+  box.style.display='block';
+  box.innerHTML=`<div class="unresolved-box">
+    <div class="unresolved-title">⚠ ${groups.length} plage(s) sans préfixe résolu</div>
+    ${groups.map(g=>`<div class="unresolved-group">
+      <div class="unresolved-group-meta">Chunks #${g.start+1} à #${g.end+1} (${g.count} chunk(s))</div>
+      <div class="unresolved-group-preview">${esc(g.preview)}</div>
+      <div class="unresolved-group-input">
+        <input type="text" id="ml_${g.key}" placeholder="Libellé (vide = pas de préfixe)">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">optionnel</span>
+      </div></div>`).join('')}
+    <div class="unresolved-actions">
+      <button class="btn btn-primary" style="width:auto" onclick="submitManualLabels()">Appliquer et finaliser →</button>
+      <button class="btn btn-sm" onclick="generate({},true)">Ignorer — générer sans préfixes</button>
+    </div></div>`;
+}
+function submitManualLabels(){
+  const labels={};
+  document.querySelectorAll('[id^="ml_"]').forEach(input=>{
+    const key=input.id.replace('ml_','');
+    const val=input.value.trim();
+    const match=key.match(/group_(\d+)_(\d+)/);
+    if(match){const start=parseInt(match[1]),end=parseInt(match[2]);for(let i=start;i<=end;i++)labels[`chunk_${i}`]=val;}
+  });
+  generate(labels,false);
+}
+function renderPreview(preview){
+  document.getElementById('previewTabs').innerHTML=preview.map((c,i)=>
+    `<button class="tab-btn ${i===0?'active':''}" onclick="switchTab(${i})">#${c.index} <span style="color:var(--muted2);font-size:9px">${c.size.toLocaleString()}c</span>${c.prefix_label?'<span style="color:var(--blue)"> ⬡</span>':''}</button>`
+  ).join('');
+  document.getElementById('previewCards').innerHTML=preview.map((c,i)=>
+    `<div class="chunk-card ${i===0?'active':''}">
+      <div class="chunk-meta"><span>Chunk #${c.index}</span><span>${c.size.toLocaleString()} chars</span><span>≈ ${c.tokens.toLocaleString()} tokens</span><span style="color:${c.resolved?'var(--green)':'var(--amber)'}">${c.resolved?(c.prefix_label?'✓ préfixé':'✓ sans préfixe'):'⚠ non résolu'}</span></div>
+      ${c.prefix_label?`<div class="chunk-prefix">[${esc(c.prefix_label)}]</div>`:''}
+      <div class="chunk-text">${esc(c.text)}</div>
+    </div>`
+  ).join('');
+}
+function switchTab(i){
+  document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',i===j));
+  document.querySelectorAll('.chunk-card').forEach((c,j)=>c.classList.toggle('active',i===j));
+}
+async function switchView(mode){
+  document.getElementById('togChunked').classList.toggle('active',mode==='chunked');
+  document.getElementById('togRaw').classList.toggle('active',mode==='raw');
+  document.getElementById('chunkedView').style.display=mode==='chunked'?'block':'none';
+  document.getElementById('rawView').style.display=mode==='raw'?'block':'none';
+  if(mode==='raw'){
+    const el=document.getElementById('rawContent');
+    if(!rawCache){
+      el.textContent='Chargement…';
+      try{const r=await fetch(`/projects/${PID}/download/raw`);rawCache=await r.text();}
+      catch(e){el.textContent='Erreur.';return;}
+    }
+    el.textContent=rawCache;
+  }
+}
+function toggleCheat(){const c=document.getElementById('cheatsheet'),a=document.getElementById('cheatArrow');c.classList.toggle('open');a.textContent=c.classList.contains('open')?'▼':'▶';}
+function addCheat(type,btn){const code=btn.closest('.cheat-item').querySelector('.cheat-code').textContent;if(type==='rem')addRuleRow('removalsList',code);else addRuleRow('splitsList',code);toast('Ajouté.');}
+document.getElementById('fileInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)document.getElementById('fileChosen').innerText=f.name;});
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+zone.addEventListener('drop',()=>zone.classList.remove('drag'));
+</script>
+</body>
+</html>
