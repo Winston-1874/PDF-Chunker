@@ -35,4 +35,4 @@ Accéder à : http://localhost:8765
 
 ## Déploiement serveur
 
-Utiliser `deploy_vXX.sh` (installe le service systemd sur `/opt/pdf-chunker`).
+Utiliser `deploy.sh` (installe le service systemd sur `/opt/pdf-chunker`).

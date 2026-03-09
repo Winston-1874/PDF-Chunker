@@ -1,5 +1,5 @@
 #!/bin/bash
-# Déploiement PDF-Chunker v0.6+
+# Déploiement PDF-Chunker
 # Usage :
 #   Première installation : sudo bash deploy.sh install
 #   Mise à jour           : sudo bash deploy.sh update
