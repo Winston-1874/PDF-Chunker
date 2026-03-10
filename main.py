@@ -450,6 +450,35 @@ async def export_config(request: Request, pid: str):
     return StreamingResponse(buf, media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
+@app.post("/projects/{pid}/import-config")
+async def import_config(request: Request, pid: str, file: UploadFile = File(...)):
+    if not check_auth(request): raise HTTPException(401)
+    proj = load_project(pid)
+    if not proj: raise HTTPException(404)
+
+    try:
+        content = await file.read()
+        cfg = json.loads(content.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(400, "Fichier JSON invalide.")
+
+    if "rules" not in cfg or not isinstance(cfg["rules"], dict):
+        raise HTTPException(400, "Format de config invalide : clé 'rules' manquante.")
+
+    rules = cfg["rules"]
+    proj["rules"] = {
+        "removals": rules.get("removals", []),
+        "splits": rules.get("splits", []),
+        "prefix_rules": rules.get("prefix_rules", []),
+        "max_size": rules.get("max_size", 2500),
+        "add_markers": rules.get("add_markers", True),
+    }
+    if "manual_labels" in cfg and isinstance(cfg["manual_labels"], dict):
+        proj["manual_labels"] = cfg["manual_labels"]
+
+    save_project(pid, proj)
+    return JSONResponse({"ok": True, "rules": proj["rules"], "manual_labels": proj.get("manual_labels", {})})
+
 # ── Routes : Downloads ────────────────────────────────────────────────────────
 
 @app.get("/projects/{pid}/download/raw")

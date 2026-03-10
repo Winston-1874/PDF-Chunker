@@ -209,6 +209,8 @@
       <button class="btn btn-primary" id="generateBtn" onclick="generate()">Générer les chunks →</button>
       <div style="display:flex;gap:6px;margin-top:8px">
         <a href="/projects/{{ project.id }}/export-config" class="btn btn-sm" style="text-decoration:none;text-align:center;flex:1">↓ Export config</a>
+        <button class="btn btn-sm" style="flex:1" onclick="document.getElementById('importConfigInput').click()">↑ Import config</button>
+        <input type="file" id="importConfigInput" accept=".json" style="display:none" onchange="importConfig(this)">
       </div>
     </div>
   </div>
@@ -440,6 +442,27 @@ async function switchView(mode){
   }
 }
 function toggleCheat(){const c=document.getElementById('cheatsheet'),a=document.getElementById('cheatArrow');c.classList.toggle('open');a.textContent=c.classList.contains('open')?'▼':'▶';}
+async function importConfig(input){
+  const f=input.files[0];if(!f)return;
+  input.value='';
+  const fd=new FormData();fd.append('file',f);
+  try{
+    const res=await fetch(`/projects/${PID}/import-config`,{method:'POST',body:fd});
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||`HTTP ${res.status}`);}
+    const data=await res.json();
+    const r=data.rules||{};
+    document.getElementById('removalsList').innerHTML='';
+    document.getElementById('splitsList').innerHTML='';
+    document.getElementById('prefixList').innerHTML='';
+    (r.removals||[]).forEach(v=>addRuleRow('removalsList',v));
+    (r.splits||[]).forEach(v=>addRuleRow('splitsList',v));
+    (r.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern||'',pr.label||''));
+    document.getElementById('maxChunkSize').value=r.max_size||2500;
+    document.getElementById('addMarkers').checked=r.add_markers!==false;
+    document.getElementById('presetSelect').value='';
+    toast('Config importée.');
+  }catch(e){alert('Erreur import : '+e.message);}
+}
 function addCheat(type,btn){const code=btn.closest('.cheat-item').querySelector('.cheat-code').textContent;if(type==='rem')addRuleRow('removalsList',code);else addRuleRow('splitsList',code);toast('Ajouté.');}
 document.getElementById('fileInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)document.getElementById('fileChosen').innerText=f.name;});
 const zone=document.getElementById('uploadZone');
