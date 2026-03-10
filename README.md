@@ -21,3 +21,5 @@ Application web FastAPI pour configurer le chunking de textes juridiques en vue 
 - Conversion PDF : PyMuPDF / pymupdf4llm
 - Auth : cookie signé (itsdangerous)
 - Templates : Jinja2
+
+- Update : ./deploy.sh update
