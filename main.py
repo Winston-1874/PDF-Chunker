@@ -107,13 +107,18 @@ def apply_chunking(md_text: str, removals: list, splits: list,
     # 1. Suppressions
     for r in removals:
         if r and r.strip():
-            try: md_text = re.sub(r, " ", md_text)
-            except re.error: pass
+            try:
+                r_decoded = r.encode('raw_unicode_escape').decode('unicode_escape')
+                md_text = re.sub(r_decoded, " ", md_text)
+            except Exception: pass
 
     # 2. Splits
     segments = [md_text]
     for s in splits:
         if s and s.strip():
+            try:
+                s = s.encode('raw_unicode_escape').decode('unicode_escape')
+            except Exception: pass
             new_segments = []
             for seg in segments:
                 try:
