@@ -365,6 +365,7 @@ async function uploadPdf(){
     toast(`PDF converti — ${(data.chars/1000).toFixed(0)}k caractères bruts.`);
     document.querySelector('.upload-zone .hint').textContent=f.name;
     document.getElementById('dlRaw').classList.remove('disabled');
+    renderRes(data,true);
   }catch(e){alert('Erreur upload : '+e.message);}
   finally{btn.disabled=false;btn.innerHTML='Ré-uploader';}
 }
@@ -381,17 +382,24 @@ async function generate(manualLabels={},acceptUnresolved=false){
       body:JSON.stringify({rules:collectRules(),manual_labels:manualLabels,accept_unresolved:acceptUnresolved})});
     if(!res.ok)throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
+    renderRes(data);
+  }catch(e){alert('Erreur : '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='Générer les chunks →';}
+}
+function renderRes(data,isUpload=false){
+  if(!isUpload){
     renderStats(data.stats,data.unresolved_groups||[]);
     renderPreview(data.preview);
-    document.getElementById('welcome').style.display='none';
-    document.getElementById('results').style.display='block';
     if(data.done){
       toast(`${data.stats.total} chunks générés.`);
       document.getElementById('dlChunks').classList.remove('disabled');
       document.getElementById('dlZip').classList.remove('disabled');
     }
-  }catch(e){alert('Erreur : '+e.message);}
-  finally{btn.disabled=false;btn.innerHTML='Générer les chunks →';}
+  }
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('results').style.display='block';
+  if(isUpload)rawCache=null;
+  switchView(isUpload?'raw':'chunked');
 }
 function renderStats(s,unresolvedGroups){
   document.getElementById('sTotal').innerText=s.total;
