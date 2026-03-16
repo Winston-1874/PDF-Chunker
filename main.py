@@ -105,13 +105,12 @@ def estimate_tokens(text: str) -> int:
 def apply_chunking(md_text: str, replacements: list, removals: list, splits: list,
                    prefix_rules: list, manual_labels: dict,
                    max_size: int = 2500, add_markers: bool = True) -> list:
-    # Step 0: Replacements (pattern → substitution)
+    # Step 0: Replacements (literal str.replace, not regex)
     for r in replacements:
         pat = r.get("pattern", "") if isinstance(r, dict) else ""
         rep = r.get("replacement", "") if isinstance(r, dict) else ""
-        if pat and pat.strip():
-            try: md_text = re.sub(pat, rep, md_text)
-            except: pass
+        if pat:
+            md_text = md_text.replace(pat, rep)
     # Step 1: Suppressions
     for r in removals:
         if r and r.strip():
