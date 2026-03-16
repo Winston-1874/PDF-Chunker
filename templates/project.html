@@ -151,9 +151,17 @@
         <div class="checkbox-row"><input type="checkbox" id="addMarkers" {% if project.rules.add_markers != false %}checked{% endif %}><label for="addMarkers" style="font-family:var(--mono);font-size:11px;cursor:pointer">Marqueurs de continuité</label></div>
       </div>
     </div>
-    <!-- 3. Preset -->
+    <!-- 3. Remplacements -->
     <div>
-      <div class="section-head">3 · Preset</div>
+      <div class="section-head">3 · Remplacements</div>
+      <div class="rules-block">
+        <div id="replacementsList"></div>
+        <button class="btn-add" onclick="addReplacementRow('replacementsList')">+ Remplacement</button>
+      </div>
+    </div>
+    <!-- 4. Preset -->
+    <div>
+      <div class="section-head">4 · Preset</div>
       <div class="preset-row">
         <select id="presetSelect" onchange="applySelectedPreset()">
           <option value="">— Personnalisé —</option>
@@ -162,14 +170,10 @@
         <button class="btn btn-sm btn-danger" onclick="deleteCurrentPreset()">✕</button>
       </div>
     </div>
-    <!-- 4. Règles -->
+    <!-- 5. Règles -->
     <div>
-      <div class="section-head">4 · Remplacements, suppressions &amp; séparateurs</div>
+      <div class="section-head">5 · Suppressions &amp; séparateurs</div>
       <div class="rules-block">
-        <div class="label" style="margin-bottom:6px">0 · Remplacements</div>
-        <div id="replacementsList"></div>
-        <button class="btn-add" onclick="addReplacementRow('replacementsList')">+ Remplacement</button>
-        <div class="sep"></div>
         <div class="label" style="margin-bottom:6px">Suppressions</div>
         <div id="removalsList"></div>
         <button class="btn-add" onclick="addRuleRow('removalsList')">+ Suppression</button>
@@ -197,9 +201,9 @@
         </div>
       </div>
     </div>
-    <!-- 5. Préfixes -->
+    <!-- 6. Préfixes -->
     <div>
-      <div class="section-head">5 · Préfixes de contexte</div>
+      <div class="section-head">6 · Préfixes de contexte</div>
       <div class="rules-block">
         <div class="prefix-rule-header"><span>Pattern regex</span><span>Libellé</span><span></span><span></span></div>
         <div id="prefixList"></div>
