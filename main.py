@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import fcntl, io, json, os, re, secrets, shutil, zipfile
+import fcntl, io, json, os, re, secrets, shutil, unicodedata, zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -333,6 +333,7 @@ async def upload_pdf(
     except Exception: pass
 
     raw_md = pymupdf4llm.to_markdown(str(pdf_path), pages=pages)
+    raw_md = unicodedata.normalize('NFKC', raw_md)
     (project_dir(pid) / "raw.md").write_bytes(raw_md.encode("utf-8"))
 
     proj["filename"] = file.filename
