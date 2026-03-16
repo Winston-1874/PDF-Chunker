@@ -115,6 +115,9 @@
   .toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;font-family:var(--mono);font-size:11px;padding:10px 16px;transform:translateY(60px);opacity:0;transition:all .2s;pointer-events:none;z-index:999}
   .toast.show{transform:translateY(0);opacity:1}
   .version-badge{position:fixed;bottom:16px;left:20px;font-family:var(--mono);font-size:10px;color:var(--muted2);pointer-events:none;z-index:998}
+  .dify-field{display:flex;flex-direction:column;gap:2px}
+  .dify-key{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2)}
+  .dify-val{font-family:var(--mono);font-size:11px;color:var(--text);word-break:break-all}
   ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-dark)}
 </style>
 </head>
@@ -139,6 +142,14 @@
       <div class="two-col" style="margin-top:8px">
         <div><span class="label">Page début</span><input type="number" id="pageStart" min="1" placeholder="1"></div>
         <div><span class="label">Page fin</span><input type="number" id="pageEnd" min="1" placeholder="fin"></div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="label">Modèle LLM (auto-config)</span>
+        <input type="text" id="autoConfigModel" value="google/gemini-3.1-pro-preview" placeholder="ex: google/gemini-2.5-pro-preview">
+      </div>
+      <div style="margin-top:8px">
+        <span class="label">Instructions supplémentaires</span>
+        <textarea id="autoConfigExtra" rows="2" placeholder="Ex: Ce document est un cours universitaire…" style="resize:vertical"></textarea>
       </div>
       <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()" style="margin-top:10px">
         {% if project.filename %}Ré-uploader{% else %}Uploader →{% endif %}
@@ -202,6 +213,13 @@
         </div>
       </div>
     </div>
+    <!-- Dify recommendation -->
+    <div id="difyReco" class="opt-box" style="display:none">
+      <div class="section-head" style="margin-bottom:6px">Paramètres Dify recommandés</div>
+      <div id="difyExplanation" style="font-family:var(--mono);font-size:11px;color:var(--muted);font-style:italic"></div>
+      <div id="difyFields" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+      <button class="btn btn-sm" onclick="copyDifyJson()" style="margin-top:6px;align-self:flex-start">Copier JSON</button>
+    </div>
     <!-- 6. Préfixes -->
     <div>
       <div class="section-head">6 · Préfixes de contexte</div>
@@ -246,9 +264,12 @@
       <span class="label">Distribution</span>
       <div id="distBars" class="dist-bars"></div>
       <span class="label">Aperçu</span>
-      <div class="view-toggle">
-        <button class="tog-btn active" id="togChunked" onclick="switchView('chunked')">Chunké</button>
-        <button class="tog-btn" id="togRaw" onclick="switchView('raw')">Brut</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="view-toggle" style="margin-bottom:0">
+          <button class="tog-btn active" id="togChunked" onclick="switchView('chunked')">Chunké</button>
+          <button class="tog-btn" id="togRaw" onclick="switchView('raw')">Brut</button>
+        </div>
+        <button class="btn btn-sm" id="autoConfigBtn" onclick="autoConfig()" style="display:none">⚡ Auto-config</button>
       </div>
       <div id="chunkedView"><div id="previewTabs" class="preview-tabs"></div><div id="previewCards"></div></div>
       <div id="rawView" style="display:none">
@@ -268,7 +289,7 @@
 <script id="data-presets" type="application/json">{{ presets|tojson }}</script>
 <script>
 const PID="{{ project.id }}";
-let project={},presets=[],rawCache=null;
+let project={},presets=[],rawCache=null,currentHash='',lastDify=null;
 try{project=JSON.parse(document.getElementById('data-project').textContent);}catch(e){}
 try{presets=JSON.parse(document.getElementById('data-presets').textContent);}catch(e){}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
@@ -282,6 +303,7 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
   if(r.max_size)document.getElementById('maxChunkSize').value=r.max_size;
   if(r.add_markers===false)document.getElementById('addMarkers').checked=false;
   if(project.stats)renderStats(project.stats,[]);
+  if(project.filename){currentHash=PID;document.getElementById('autoConfigBtn').style.display='';}
 })();
 function addReplacementRow(id,pat='',rep=''){
   const c=document.getElementById(id),d=document.createElement('div');
@@ -398,8 +420,62 @@ function renderRes(data,isUpload=false){
   }
   document.getElementById('welcome').style.display='none';
   document.getElementById('results').style.display='block';
-  if(isUpload)rawCache=null;
+  if(isUpload){
+    rawCache=null;
+    currentHash=PID;
+    document.getElementById('autoConfigBtn').style.display='';
+    document.getElementById('difyReco').style.display='none';
+  }
   switchView(isUpload?'raw':'chunked');
+}
+async function autoConfig(){
+  if(!currentHash){toast('Uploadez d\'abord un PDF.');return;}
+  const btn=document.getElementById('autoConfigBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--text)"></span>Analyse…';
+  try{
+    const fd=new FormData();
+    fd.append('hash',currentHash);
+    fd.append('model',document.getElementById('autoConfigModel').value.trim()||'google/gemini-3.1-pro-preview');
+    fd.append('extra_instructions',document.getElementById('autoConfigExtra').value);
+    const res=await fetch('/autoconfig',{method:'POST',body:fd});
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||`HTTP ${res.status}`);}
+    const data=await res.json();
+    document.getElementById('replacementsList').innerHTML='';
+    document.getElementById('removalsList').innerHTML='';
+    document.getElementById('splitsList').innerHTML='';
+    (data.replacements||[]).forEach(r=>addReplacementRow('replacementsList',r.pattern||'',r.replacement||''));
+    (data.removals||[]).forEach(v=>addRuleRow('removalsList',v));
+    (data.splits||[]).forEach(v=>addRuleRow('splitsList',v));
+    document.getElementById('maxChunkSize').value=data.max_size||2500;
+    if(data.dify)renderDifyReco(data.dify);
+    toast('Configuration appliquée — vérifiez et ajustez avant de lancer');
+  }catch(e){alert('Erreur auto-config : '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='⚡ Auto-config';}
+}
+function renderDifyReco(dify){
+  lastDify=dify;
+  document.getElementById('difyExplanation').textContent=dify.explanation||'';
+  const f=document.getElementById('difyFields');
+  if(dify.mode==='chunker'){
+    f.innerHTML=
+      `<div class="dify-field"><span class="dify-key">Mode</span><span class="dify-val">chunker</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Séparateur</span><span class="dify-val">${esc(dify.chunk_separator)}</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Taille max</span><span class="dify-val">${dify.chunk_max_size}</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Overlap</span><span class="dify-val">${dify.chunk_overlap}</span></div>`;
+  }else{
+    f.innerHTML=
+      `<div class="dify-field"><span class="dify-key">Mode</span><span class="dify-val">parent / child</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Séparateur parent</span><span class="dify-val">${esc(dify.parent_separator)}</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Taille parent</span><span class="dify-val">${dify.parent_max_size}</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Séparateur enfant</span><span class="dify-val">${esc(dify.child_separator)}</span></div>`+
+      `<div class="dify-field"><span class="dify-key">Taille enfant</span><span class="dify-val">${dify.child_max_size}</span></div>`;
+  }
+  document.getElementById('difyReco').style.display='flex';
+}
+function copyDifyJson(){
+  if(!lastDify)return;
+  navigator.clipboard.writeText(JSON.stringify(lastDify,null,2));
+  toast('JSON Dify copié.');
 }
 function renderStats(s,unresolvedGroups){
   document.getElementById('sTotal').innerText=s.total;

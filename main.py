@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import fitz
+import httpx
 import pymupdf4llm
 from fastapi import FastAPI, File, Form, Request, UploadFile, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -11,9 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer
 
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "changeme")
-SECRET_KEY   = os.environ.get("SECRET_KEY", "CHANGEME_FIXED_KEY")
-DATA_DIR     = Path(os.environ.get("DATA_DIR", "/opt/pdf-chunker/data"))
+APP_PASSWORD       = os.environ.get("APP_PASSWORD", "changeme")
+SECRET_KEY         = os.environ.get("SECRET_KEY", "CHANGEME_FIXED_KEY")
+DATA_DIR           = Path(os.environ.get("DATA_DIR", "/opt/pdf-chunker/data"))
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 PROJECTS_DIR = DATA_DIR / "projects"
 PRESETS_FILE = DATA_DIR / "presets.json"
 
@@ -526,6 +528,104 @@ async def download_zip(request: Request, pid: str):
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{base}_chunks.zip"'})
+
+# ── Routes : Auto-config ──────────────────────────────────────────────────────
+
+_SYSTEM_PROMPT = (
+    "Tu es un expert en traitement de documents juridiques et fiscaux belges et "
+    "luxembourgeois convertis en Markdown via pymupdf4llm. Tu analyses un extrait "
+    "de document et tu produis une configuration JSON de chunking. "
+    "Réponds UNIQUEMENT avec le JSON brut, sans markdown, sans explication."
+)
+
+@app.post("/autoconfig")
+async def autoconfig(
+    request: Request,
+    hash: str = Form(...),
+    model: str = Form("google/gemini-3.1-pro-preview"),
+    extra_instructions: str = Form(""),
+):
+    if not check_auth(request): raise HTTPException(401)
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(503, "OPENROUTER_API_KEY non configurée.")
+
+    pdf_path = project_dir(hash) / "source.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(404, "PDF non trouvé — uploadez d'abord le document.")
+
+    doc = fitz.open(str(pdf_path))
+    page_count = doc.page_count
+    doc.close()
+
+    N = min(15, page_count)
+    raw_extract = pymupdf4llm.to_markdown(str(pdf_path), pages=list(range(N)))
+    raw_extract = unicodedata.normalize("NFKC", raw_extract)
+
+    user_prompt = (
+        f"Voici un extrait Markdown des {N} premières pages d'un document PDF converti par pymupdf4llm.\n\n"
+        "Analyse la structure et produis un objet JSON avec exactement ces champs :\n\n"
+        "- \"replacements\" : liste de {\"pattern\": \"...\", \"replacement\": \"...\"} pour corriger les "
+        "ligatures fragmentées (cherche les séquences \"fi \", \"ff \", \"fl \" au milieu des mots, "
+        "ex: \"chiff re\" → \"chiffre\")\n"
+        "- \"removals\" : liste de regex Python à supprimer (pieds de page, numéros de page, "
+        "en-têtes répétés, notes de bas de page)\n"
+        "- \"splits\" : liste de regex Python pour découper aux frontières logiques, chaque regex "
+        "avec un groupe capturant. Laisser vide si mode parent_child.\n"
+        "- \"max_size\" : taille max recommandée en caractères (1500–4000 selon densité)\n"
+        "- \"dify\" : choisir entre deux modes :\n\n"
+        "  Mode \"chunker\" (structure régulière, articles identifiables) :\n"
+        "  {\"mode\": \"chunker\", \"explanation\": \"...\", \"chunk_separator\": \"\\\\n\\\\n---\\\\n\\\\n\", "
+        "\"chunk_max_size\": <identique à max_size>, \"chunk_overlap\": 0}\n\n"
+        "  Mode \"parent_child\" (texte narratif, structure irrégulière) :\n"
+        "  {\"mode\": \"parent_child\", \"explanation\": \"...\", \"parent_separator\": \"...\", "
+        "\"parent_max_size\": <int>, \"child_separator\": \"\\\\n\\\\n\", \"child_max_size\": <int, 500–1200>}\n\n"
+        "  En mode \"parent_child\", \"splits\" doit être vide. "
+        "En mode \"chunker\", Dify ne re-découpe pas : séparateur = \\\\n\\\\n---\\\\n\\\\n, overlap = 0."
+    )
+    if extra_instructions.strip():
+        user_prompt += f"\n\nInstructions supplémentaires :\n{extra_instructions}"
+    user_prompt += f"\n\nExtrait :\n{raw_extract}"
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": _SYSTEM_PROMPT},
+                        {"role": "user",   "content": user_prompt},
+                    ],
+                },
+            )
+            resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(502, f"OpenRouter HTTP {e.response.status_code}")
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"Erreur réseau OpenRouter : {e}")
+
+    try:
+        content = resp.json()["choices"][0]["message"]["content"].strip()
+        # Strip markdown code fences if the model wraps the JSON
+        if content.startswith("```"):
+            parts = content.split("```")
+            content = parts[1].lstrip("json").strip() if len(parts) > 1 else content
+        result = json.loads(content)
+    except Exception as e:
+        raise HTTPException(502, f"JSON invalide retourné par le modèle : {e}")
+
+    if not isinstance(result.get("removals"), list) or not isinstance(result.get("splits"), list):
+        raise HTTPException(502, "Réponse invalide : removals et splits doivent être des listes.")
+
+    return JSONResponse({
+        "replacements": result.get("replacements", []),
+        "removals":     result.get("removals", []),
+        "splits":       result.get("splits", []),
+        "max_size":     result.get("max_size", 2500),
+        "dify":         result.get("dify", {}),
+    })
+
 
 # ── Routes : Presets ──────────────────────────────────────────────────────────
 
