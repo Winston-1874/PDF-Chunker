@@ -590,7 +590,10 @@ async def autoconfig(
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+                headers={
+                    "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY')}",
+                    "Content-Type": "application/json",
+                },
                 json={
                     "model": model,
                     "messages": [
