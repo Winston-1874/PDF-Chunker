@@ -151,9 +151,17 @@
         <div class="checkbox-row"><input type="checkbox" id="addMarkers" {% if project.rules.add_markers != false %}checked{% endif %}><label for="addMarkers" style="font-family:var(--mono);font-size:11px;cursor:pointer">Marqueurs de continuité</label></div>
       </div>
     </div>
-    <!-- 3. Preset -->
+    <!-- 3. Remplacements -->
     <div>
-      <div class="section-head">3 · Preset</div>
+      <div class="section-head">3 · Remplacements</div>
+      <div class="rules-block">
+        <div id="replacementsList"></div>
+        <button class="btn-add" onclick="addReplacementRow('replacementsList')">+ Remplacement</button>
+      </div>
+    </div>
+    <!-- 4. Preset -->
+    <div>
+      <div class="section-head">4 · Preset</div>
       <div class="preset-row">
         <select id="presetSelect" onchange="applySelectedPreset()">
           <option value="">— Personnalisé —</option>
@@ -162,9 +170,9 @@
         <button class="btn btn-sm btn-danger" onclick="deleteCurrentPreset()">✕</button>
       </div>
     </div>
-    <!-- 4. Règles -->
+    <!-- 5. Règles -->
     <div>
-      <div class="section-head">4 · Suppressions &amp; séparateurs</div>
+      <div class="section-head">5 · Suppressions &amp; séparateurs</div>
       <div class="rules-block">
         <div class="label" style="margin-bottom:6px">Suppressions</div>
         <div id="removalsList"></div>
@@ -177,6 +185,9 @@
       <div style="margin-top:10px">
         <button class="cheat-toggle" onclick="toggleCheat()"><span id="cheatArrow">▶</span> Aide-mémoire regex</button>
         <div class="cheatsheet" id="cheatsheet">
+          <div class="cheat-section-title">Ligatures pymupdf4llm</div>
+          <div class="cheat-item"><div><div class="cheat-code">fi </div><div class="cheat-desc">fi + espace → fi (fiscal, définition…)</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rep',this,'fi')">↔ Remplacer</button></div></div>
+          <div class="cheat-item"><div><div class="cheat-code">fl </div><div class="cheat-desc">fl + espace → fl (influence…)</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rep',this,'fl')">↔ Remplacer</button></div></div>
           <div class="cheat-section-title">Moniteur belge</div>
           <div class="cheat-item"><div><div class="cheat-code">\n\nPage \d+ de \d+ Copyright Moniteur belge \d{2}-\d{2}-\d{4}\n\n</div><div class="cheat-desc">Pied de page</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
           <div class="cheat-item"><div><div class="cheat-code">([a-zàâéèêëîïôùûüç,])\n([a-zàâéèêëîïôùûüç])</div><div class="cheat-desc">Coupures mid-phrase</div></div><div class="cheat-add-btns"><button class="cheat-add-btn" onclick="addCheat('rem',this)">− Suppr.</button></div></div>
@@ -190,9 +201,9 @@
         </div>
       </div>
     </div>
-    <!-- 5. Préfixes -->
+    <!-- 6. Préfixes -->
     <div>
-      <div class="section-head">5 · Préfixes de contexte</div>
+      <div class="section-head">6 · Préfixes de contexte</div>
       <div class="rules-block">
         <div class="prefix-rule-header"><span>Pattern regex</span><span>Libellé</span><span></span><span></span></div>
         <div id="prefixList"></div>
@@ -263,6 +274,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 (function initRules(){
   const r=project.rules||{};
+  (r.replacements||[]).forEach(rep=>addReplacementRow('replacementsList',rep.pattern||'',rep.replacement||''));
   (r.removals||[]).forEach(v=>addRuleRow('removalsList',v));
   (r.splits||[]).forEach(v=>addRuleRow('splitsList',v));
   (r.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern||'',pr.label||''));
@@ -270,6 +282,16 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
   if(r.add_markers===false)document.getElementById('addMarkers').checked=false;
   if(project.stats)renderStats(project.stats,[]);
 })();
+function addReplacementRow(id,pat='',rep=''){
+  const c=document.getElementById(id),d=document.createElement('div');
+  d.className='rule-row';
+  d.innerHTML=`<input type="text" value="${esc(pat)}" placeholder="pattern regex…" style="flex:1"><span style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:0 4px">→</span><input type="text" value="${esc(rep)}" placeholder="remplacement…" style="flex:1"><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(d);
+}
+function getReplacements(){
+  const rows=document.querySelectorAll('#replacementsList .rule-row');
+  return Array.from(rows).map(r=>{const inputs=r.querySelectorAll('input');return{pattern:inputs[0].value.trim(),replacement:inputs[1].value.trim()};}).filter(r=>r.pattern);
+}
 function addRuleRow(id,val=''){
   const c=document.getElementById(id),d=document.createElement('div');
   d.className='rule-row';
@@ -311,9 +333,9 @@ async function testPrefixRule(btn){
 }
 function applySelectedPreset(){
   const id=document.getElementById('presetSelect').value;
-  document.getElementById('removalsList').innerHTML='';document.getElementById('splitsList').innerHTML='';document.getElementById('prefixList').innerHTML='';
+  document.getElementById('replacementsList').innerHTML='';document.getElementById('removalsList').innerHTML='';document.getElementById('splitsList').innerHTML='';document.getElementById('prefixList').innerHTML='';
   const p=presets.find(x=>x.id===id);
-  if(p){(p.removals||[]).forEach(r=>addRuleRow('removalsList',r));(p.splits||[]).forEach(s=>addRuleRow('splitsList',s));(p.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern,pr.label));}
+  if(p){(p.replacements||[]).forEach(r=>addReplacementRow('replacementsList',r.pattern||'',r.replacement||''));(p.removals||[]).forEach(r=>addRuleRow('removalsList',r));(p.splits||[]).forEach(s=>addRuleRow('splitsList',s));(p.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern,pr.label));}
 }
 async function deleteCurrentPreset(){
   const id=document.getElementById('presetSelect').value;
@@ -324,7 +346,7 @@ async function saveNewPreset(){
   const name=document.getElementById('newPresetName').value.trim();
   if(!name)return alert('Nom requis.');
   await fetch('/presets',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name,removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules()})});
+    body:JSON.stringify({name,replacements:getReplacements(),removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules()})});
   location.reload();
 }
 async function uploadPdf(){
@@ -346,7 +368,7 @@ async function uploadPdf(){
   finally{btn.disabled=false;btn.innerHTML='Ré-uploader';}
 }
 function collectRules(){
-  return{removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules(),
+  return{replacements:getReplacements(),removals:getRules('removalsList'),splits:getRules('splitsList'),prefix_rules:getPrefixRules(),
     max_size:parseInt(document.getElementById('maxChunkSize').value)||2500,
     add_markers:document.getElementById('addMarkers').checked};
 }
@@ -451,9 +473,11 @@ async function importConfig(input){
     if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||`HTTP ${res.status}`);}
     const data=await res.json();
     const r=data.rules||{};
+    document.getElementById('replacementsList').innerHTML='';
     document.getElementById('removalsList').innerHTML='';
     document.getElementById('splitsList').innerHTML='';
     document.getElementById('prefixList').innerHTML='';
+    (r.replacements||[]).forEach(rep=>addReplacementRow('replacementsList',rep.pattern||'',rep.replacement||''));
     (r.removals||[]).forEach(v=>addRuleRow('removalsList',v));
     (r.splits||[]).forEach(v=>addRuleRow('splitsList',v));
     (r.prefix_rules||[]).forEach(pr=>addPrefixRow(pr.pattern||'',pr.label||''));
@@ -463,7 +487,11 @@ async function importConfig(input){
     toast('Config importée.');
   }catch(e){alert('Erreur import : '+e.message);}
 }
-function addCheat(type,btn){const code=btn.closest('.cheat-item').querySelector('.cheat-code').textContent;if(type==='rem')addRuleRow('removalsList',code);else addRuleRow('splitsList',code);toast('Ajouté.');}
+function addCheat(type,btn,replacement){
+  const code=btn.closest('.cheat-item').querySelector('.cheat-code').textContent;
+  if(type==='rep'){addReplacementRow('replacementsList',code,replacement||'');toast('Ajouté aux remplacements.');}
+  else{const target=type==='rem'?'removalsList':'splitsList';addRuleRow(target,code);toast('Ajouté aux '+(type==='rem'?'suppressions':'séparateurs')+'.');}
+}
 document.getElementById('fileInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)document.getElementById('fileChosen').innerText=f.name;});
 const zone=document.getElementById('uploadZone');
 zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});

@@ -25,6 +25,7 @@ for d in (DATA_DIR, PROJECTS_DIR):
 if not PRESETS_FILE.exists():
     default_presets = [{
         "id": "default_moniteur", "name": "Moniteur belge",
+        "replacements": [{"pattern": "fi ", "replacement": "fi"}],
         "removals": [r"\n\nPage \d+ de \d+ Copyright Moniteur belge \d{2}-\d{2}-\d{4}\n\n"],
         "splits": [r"\n\n(Art\. \d+:\d+)"],
         "prefix_rules": []
@@ -101,10 +102,16 @@ def list_projects() -> list:
 def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
-def apply_chunking(md_text: str, removals: list, splits: list,
+def apply_chunking(md_text: str, replacements: list, removals: list, splits: list,
                    prefix_rules: list, manual_labels: dict,
                    max_size: int = 2500, add_markers: bool = True) -> list:
-    # 1. Suppressions
+    # Step 0: Replacements (literal str.replace, not regex)
+    for r in replacements:
+        pat = r.get("pattern", "") if isinstance(r, dict) else ""
+        rep = r.get("replacement", "") if isinstance(r, dict) else ""
+        if pat:
+            md_text = md_text.replace(pat, rep)
+    # Step 1: Suppressions
     for r in removals:
         if r and r.strip():
             try:
@@ -282,7 +289,7 @@ async def create_project(request: Request):
         "status": "empty",
         "filename": None,
         "rules": {
-            "removals": [], "splits": [], "prefix_rules": [],
+            "replacements": [], "removals": [], "splits": [], "prefix_rules": [],
             "max_size": 2500, "add_markers": True
         },
         "manual_labels": {},
@@ -354,6 +361,7 @@ async def generate(request: Request, pid: str):
     raw_text = raw_path.read_text(encoding="utf-8")
     chunks   = apply_chunking(
         raw_text,
+        rules.get("replacements", []),
         rules.get("removals", []),
         rules.get("splits", []),
         rules.get("prefix_rules", []),
@@ -411,6 +419,7 @@ async def test_prefix(request: Request, pid: str):
     raw_text = raw_path.read_text(encoding="utf-8")
     chunks   = apply_chunking(
         raw_text,
+        rules.get("replacements", []),
         rules.get("removals", []),
         rules.get("splits", []),
         [], {},
@@ -467,6 +476,7 @@ async def import_config(request: Request, pid: str, file: UploadFile = File(...)
 
     rules = cfg["rules"]
     proj["rules"] = {
+        "replacements": rules.get("replacements", []),
         "removals": rules.get("removals", []),
         "splits": rules.get("splits", []),
         "prefix_rules": rules.get("prefix_rules", []),
@@ -525,6 +535,7 @@ async def save_preset(request: Request):
     presets = load_presets()
     new_p = {
         "id": secrets.token_hex(4), "name": data.get("name"),
+        "replacements": data.get("replacements", []),
         "removals": data.get("removals", []),
         "splits": data.get("splits", []),
         "prefix_rules": data.get("prefix_rules", [])
