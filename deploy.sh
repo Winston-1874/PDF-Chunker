@@ -81,6 +81,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 APP_PASSWORD=${APP_PASS}
 SECRET_KEY=${SECRET_KEY}
 DATA_DIR=${APP_DIR}/data
+OPENROUTER_API_KEY=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
 EOF
     chmod 600 "$ENV_FILE"
     echo "  → $ENV_FILE créé (chmod 600)"
