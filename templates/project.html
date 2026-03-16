@@ -114,6 +114,7 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;font-family:var(--mono);font-size:11px;padding:10px 16px;transform:translateY(60px);opacity:0;transition:all .2s;pointer-events:none;z-index:999}
   .toast.show{transform:translateY(0);opacity:1}
+  .version-badge{position:fixed;bottom:16px;left:20px;font-family:var(--mono);font-size:10px;color:var(--muted2);pointer-events:none;z-index:998}
   ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-dark)}
 </style>
 </head>
@@ -498,5 +499,6 @@ zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag
 zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
 zone.addEventListener('drop',()=>zone.classList.remove('drag'));
 </script>
+<div class="version-badge">v1.0 · 16/03/2026</div>
 </body>
 </html>
